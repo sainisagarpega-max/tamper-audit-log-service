@@ -4,16 +4,12 @@
 
 - Name: Saini Sagar
 - Email: saini.sagarpega@gmail.com
-- Assignment title: Tamper-Evident Audit Log Service
+- Assignment title: Build an AI-Assisted Software Engineering System - Audit Log Service
 - Start date: 18-08-2026
-- Submitted date: 
+- Submitted date: To be completed at submission
 
-## Statement
+## Declaration
 
-I, Saini Sagar, attest that the work submitted in this repository is my own. I am responsible for understanding, reviewing, testing, and validating all submitted material, including any content produced with assistance from AI tools.
+I, Saini Sagar, attest that this submission is my own individual work, completed on my own machine and accounts, and that it honestly reflects my development process and use of AI.
 
-Any AI assistance used during this assignment will be disclosed in `AI_USAGE_LOG.md`. I will not present unreviewed AI-generated output or another person's work as my own, and I will follow the assignment's integrity and disclosure requirements.
-
-Signed: Saini Sagar  
-Date: 18-08-2026
-
+Signed: Saini Sagar
