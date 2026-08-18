@@ -50,12 +50,15 @@ public class AuditEvent {
     @Column(name = "content_hash", nullable = false, updatable = false, length = 64)
     private String contentHash;
 
+    @Column(name = "hash_version", nullable = false, updatable = false)
+    private Integer hashVersion;
+
     protected AuditEvent() {
     }
 
     public AuditEvent(Long sequenceNumber, String eventType, String actorId, String resourceType,
                       String resourceId, String payload, Instant occurredAt, Instant recordedAt,
-                      String previousHash, String contentHash) {
+                      String previousHash, String contentHash, Integer hashVersion) {
         this.sequenceNumber = sequenceNumber;
         this.eventType = eventType;
         this.actorId = actorId;
@@ -66,6 +69,7 @@ public class AuditEvent {
         this.recordedAt = recordedAt;
         this.previousHash = previousHash;
         this.contentHash = contentHash;
+        this.hashVersion = hashVersion;
     }
 
     public Long getId() { return id; }
@@ -79,4 +83,5 @@ public class AuditEvent {
     public Instant getRecordedAt() { return recordedAt; }
     public String getPreviousHash() { return previousHash; }
     public String getContentHash() { return contentHash; }
+    public Integer getHashVersion() { return hashVersion; }
 }

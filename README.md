@@ -4,7 +4,7 @@ This repository contains the implementation and supporting documentation for the
 
 ## Project status
 
-Requirements analysis is complete. Application implementation is the next phase.
+Scenario A is implemented: append-only writes, filtered and paginated queries, a versioned SHA-256 hash chain, and full-chain verification with tamper detection.
 
 ## Planned technology stack
 
@@ -69,3 +69,48 @@ JWT_JWK_SET_URI=https://identity.example.com/.well-known/jwks.json
 ```
 
 Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
+
+## Scenario A API
+
+| Method | Endpoint | Purpose | Required JWT role |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/audit-events` | Append an immutable audit event | `AUDIT_WRITER` |
+| `GET` | `/api/v1/audit-events` | Query using actor, resource, event type, time, and pagination filters | `AUDIT_READER` or `AUDIT_ADMIN` |
+| `GET` | `/api/v1/audit-events/verify` | Verify the complete hash chain | `AUDIT_READER` or `AUDIT_ADMIN` |
+
+JWT roles are read from the token's `roles` claim. Example:
+
+```json
+{
+  "sub": "audit-user",
+  "roles": ["AUDIT_WRITER", "AUDIT_READER"]
+}
+```
+
+Write request example:
+
+```json
+{
+  "eventType": "CLIENT_ACCOUNT_READ",
+  "actorId": "user-123",
+  "resourceType": "ACCOUNT",
+  "resourceId": "account-456",
+  "payload": {
+    "outcome": "ALLOWED",
+    "channel": "WEB"
+  },
+  "occurredAt": "2026-08-18T10:00:00Z"
+}
+```
+
+Query parameters are `actorId`, `resourceType`, `resourceId`, `eventType`, `from`, `to`, `page`, and `size`. Time filters apply to the server-assigned `recordedAt` value. Results are ordered by ascending chain sequence.
+
+The verification response reports whether the chain is intact and identifies the first broken sequence and violation type when tampering is detected.
+
+## Tests
+
+```bash
+mvn test
+```
+
+The current suite covers application startup, Flyway schema validation, linked writes, deterministic nested JSON canonicalization, combined filters, pagination, intact verification, and direct database tampering detection.

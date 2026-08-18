@@ -15,6 +15,7 @@ public record AuditEventResponse(
         Instant occurredAt,
         Instant recordedAt,
         String previousHash,
-        String contentHash
+        String contentHash,
+        Integer hashVersion
 ) {
 }

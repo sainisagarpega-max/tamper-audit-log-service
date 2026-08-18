@@ -6,7 +6,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:
@@ -27,3 +27,8 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
