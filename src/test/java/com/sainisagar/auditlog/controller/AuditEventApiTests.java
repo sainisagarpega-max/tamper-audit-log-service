@@ -116,6 +116,20 @@ class AuditEventApiTests {
                 .andExpect(jsonPath("$.violationType").value("CONTENT_HASH_MISMATCH"));
     }
 
+    @Test
+    void swaggerIsPublicAndDocumentsJwtBearerAuthentication() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("Tamper-Evident Audit Log API"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.bearerFormat").value("JWT"))
+                .andExpect(jsonPath("$.security[0].bearerAuth").isArray());
+
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
+    }
+
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtWithRole(String role) {
         return SecurityMockMvcRequestPostProcessors.jwt()
                 .jwt(jwt -> jwt.subject("test-user").claim("roles", java.util.List.of(role)))

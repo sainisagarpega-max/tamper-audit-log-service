@@ -33,4 +33,4 @@ These tests demonstrate detection, not prevention. Database permissions, immutab
 mvn test
 ```
 
-Validation on 18 August 2026: **16 tests passed, 0 failures, 0 errors, 0 skipped**.
+Validation on 18 August 2026: **19 tests passed, 0 failures, 0 errors, 0 skipped**. This includes generated OpenAPI bearer-scheme validation and direct JWT `roles`-claim conversion tests.

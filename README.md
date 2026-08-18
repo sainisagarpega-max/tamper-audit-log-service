@@ -121,4 +121,4 @@ The verification response reports whether the chain is intact and identifies the
 mvn test
 ```
 
-The current 16-test suite covers application startup, authenticated API behavior, validation and authorization, Flyway schema validation, linked writes, canonical hashing, filters, pagination, multiple tampering patterns, retention edge cases, redaction edge cases, export, client-account access recording, compliance reporting, and report self-auditing.
+The current 19-test suite covers application startup, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked writes, canonical hashing, filters, pagination, multiple tampering patterns, retention edge cases, redaction edge cases, export, client-account access recording, compliance reporting, and report self-auditing.
