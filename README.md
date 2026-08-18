@@ -22,6 +22,7 @@ Requirements analysis is complete. Application implementation is the next phase.
 - [ATTESTATION.md](ATTESTATION.md) - authorship and integrity attestation
 - [AI_USAGE_LOG.md](AI_USAGE_LOG.md) - record of AI-assisted work
 - [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) - normalized requirements, ambiguities, assumptions, and acceptance criteria
+- [docs/TASK_DECOMPOSITION.md](docs/TASK_DECOMPOSITION.md) - API plan, data model, dependencies, milestones, and quality gates
 
 The confidential assignment PDF must not be committed or redistributed.
 
