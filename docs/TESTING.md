@@ -33,4 +33,4 @@ These tests demonstrate detection, not prevention. Database permissions, immutab
 mvn test
 ```
 
-Validation on 18 August 2026: **19 tests passed, 0 failures, 0 errors, 0 skipped**. This includes generated OpenAPI bearer-scheme validation and direct JWT `roles`-claim conversion tests.
+Validation on 18 August 2026: **22 tests passed, 0 failures, 0 errors, 0 skipped**. This includes generated OpenAPI bearer-scheme validation, direct JWT `roles`-claim conversion tests, local RS256 token issuance, real bearer-token authorization, rejection of unknown roles, and local H2 console security. A live embedded-server check also confirmed the H2 login page returns HTTP 200.

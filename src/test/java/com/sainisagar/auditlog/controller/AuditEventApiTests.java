@@ -11,11 +11,13 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -29,6 +31,9 @@ class AuditEventApiTests {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private MockMvc mockMvc;
 
@@ -128,6 +133,48 @@ class AuditEventApiTests {
 
         mockMvc.perform(get("/swagger-ui.html"))
                 .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
+    void localTokenEndpointIssuesJwtThatAuthorizesProtectedApi() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/dev/token")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "subject": "saini-sagar",
+                                  "roles": ["AUDIT_READER"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(1800))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andReturn().getResponse().getContentAsString();
+        String token = objectMapper.readTree(response).path("accessToken").asString();
+
+        mockMvc.perform(get("/api/v1/audit-events/verify")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.intact").value(true));
+    }
+
+    @Test
+    void localTokenEndpointRejectsUnknownRole() throws Exception {
+        mockMvc.perform(post("/api/v1/dev/token")
+                        .contentType("application/json")
+                        .content("""
+                                {"subject":"saini-sagar","roles":["SUPER_ADMIN"]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid request"));
+    }
+
+    @Test
+    void h2ConsoleIsAccessibleAndAllowsSameOriginFramesInLocalProfile() throws Exception {
+        mockMvc.perform(get("/h2-console/"))
+                // MockMvc does not mount Boot's separately registered H2 servlet.
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("X-Frame-Options", "SAMEORIGIN"));
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtWithRole(String role) {

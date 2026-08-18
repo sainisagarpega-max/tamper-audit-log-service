@@ -8,3 +8,9 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+app:
+  jwt:
+    local:
+      issuer: http://localhost:8080
+      ttl-minutes: 30

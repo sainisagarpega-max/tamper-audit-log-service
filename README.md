@@ -56,7 +56,48 @@ Prerequisites: Java 21 and Maven 3.6.3 or newer.
 mvn spring-boot:run
 ```
 
-The default `local` profile uses an in-memory H2 database. API documentation is available at `http://localhost:8080/swagger-ui.html`. Protected API calls require a JWT issued by the configured `JWT_ISSUER_URI`; its public keys are loaded from `JWT_JWK_SET_URI`.
+The default `local` profile uses an in-memory H2 database. API documentation is available at `http://localhost:8080/swagger-ui.html`. The local profile provides a development-only token endpoint described below. Production remains an OAuth2 resource server and validates tokens from the configured external identity provider.
+
+### H2 console
+
+The H2 console is available only with the `local` profile at `http://localhost:8080/h2-console/`.
+
+Use these connection values:
+
+```text
+Driver Class: org.h2.Driver
+JDBC URL: jdbc:h2:mem:auditlog
+User Name: sa
+Password: (leave blank)
+```
+
+The configured datasource URL contains compatibility options, but the console can connect using the shorter URL above because it addresses the same named in-memory database. In IntelliJ, set the active profile to `local`, or run on Windows PowerShell with:
+
+```bash
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+## Local JWT token
+
+With the application running under the default `local` profile, request a 30-minute token:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/dev/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "saini-sagar",
+    "roles": ["AUDIT_WRITER", "AUDIT_READER", "AUDIT_ADMIN", "AUDIT_COMPLIANCE"]
+  }'
+```
+
+Copy `accessToken` from the response. In Swagger UI, select **Authorize** and paste the token. For a command-line request:
+
+```bash
+curl http://localhost:8080/api/v1/audit-events/verify \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Allowed local roles are `AUDIT_WRITER`, `AUDIT_READER`, `AUDIT_ADMIN`, and `AUDIT_COMPLIANCE`. The RSA signing key is generated in memory at startup, so local tokens become invalid when the application restarts. The token endpoint and signing key beans are restricted to the `local` Spring profile and are absent in production.
 
 ## Production database
 
@@ -85,6 +126,7 @@ Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
 | `GET` | `/api/v1/audit-events/export` | Export by actor or resource with chain metadata | `AUDIT_READER` or `AUDIT_ADMIN` |
 | `POST` | `/api/v1/compliance/account-access` | Record an allowed or denied client-account access attempt | `AUDIT_WRITER` |
 | `GET` | `/api/v1/compliance/account-access` | Query the client-account access compliance report | `AUDIT_COMPLIANCE` or `AUDIT_ADMIN` |
+| `POST` | `/api/v1/dev/token` | Generate a short-lived JWT for local development only | Public, local profile only |
 
 JWT roles are read from the token's `roles` claim. Example:
 
@@ -121,4 +163,4 @@ The verification response reports whether the chain is intact and identifies the
 mvn test
 ```
 
-The current 19-test suite covers application startup, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked writes, canonical hashing, filters, pagination, multiple tampering patterns, retention edge cases, redaction edge cases, export, client-account access recording, compliance reporting, and report self-auditing.
+The current 22-test suite covers application startup, local H2 console security, local RS256 token issuance and validation, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked writes, canonical hashing, filters, pagination, multiple tampering patterns, retention edge cases, redaction edge cases, export, client-account access recording, compliance reporting, and report self-auditing.
