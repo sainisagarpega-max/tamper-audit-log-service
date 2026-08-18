@@ -19,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost/unused",
@@ -100,6 +101,35 @@ class AuditEventServiceIntegrationTests {
     }
 
     @Test
+    void detectsDeletedRecordAsSequenceGap() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        service.create(request("UPDATE", "actor-2", "account-2", "{\"result\":\"OK\"}"));
+        service.create(request("DELETE", "actor-3", "account-3", "{\"result\":\"OK\"}"));
+
+        jdbcTemplate.update("delete from audit_events where sequence_number = 2");
+
+        ChainVerificationResponse result = service.verify();
+        assertThat(result.intact()).isFalse();
+        assertThat(result.recordsChecked()).isEqualTo(1);
+        assertThat(result.firstBrokenSequence()).isEqualTo(3);
+        assertThat(result.violationType()).isEqualTo(ViolationType.SEQUENCE_GAP);
+    }
+
+    @Test
+    void detectsChangedChainLink() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        service.create(request("UPDATE", "actor-2", "account-2", "{\"result\":\"OK\"}"));
+
+        jdbcTemplate.update("update audit_events set previous_hash = ? where sequence_number = 2",
+                "f".repeat(64));
+
+        ChainVerificationResponse result = service.verify();
+        assertThat(result.intact()).isFalse();
+        assertThat(result.firstBrokenSequence()).isEqualTo(2);
+        assertThat(result.violationType()).isEqualTo(ViolationType.PREVIOUS_HASH_MISMATCH);
+    }
+
+    @Test
     void canonicalPayloadAndHashAreIndependentOfObjectKeyOrder() throws Exception {
         var firstPayload = objectMapper.readTree("{\"outer\":{\"b\":2,\"a\":1},\"z\":true}");
         var secondPayload = objectMapper.readTree("{\"z\":true,\"outer\":{\"a\":1,\"b\":2}}");
@@ -133,6 +163,25 @@ class AuditEventServiceIntegrationTests {
     }
 
     @Test
+    void rejectsMissingAndRepeatedRedactions() {
+        AuditEventResponse event = service.create(request("READ", "actor-1", "account-1",
+                "{\"customer\":{\"accountNumber\":\"123456789\"}}"));
+        RedactionRequest valid = new RedactionRequest("/customer/accountNumber", "privacy-admin",
+                "privacy request");
+
+        assertThatThrownBy(() -> redactionService.redact(event.id(),
+                new RedactionRequest("/customer/missing", "privacy-admin", "privacy request")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("existing field");
+
+        redactionService.redact(event.id(), valid);
+        assertThatThrownBy(() -> redactionService.redact(event.id(), valid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("already redacted");
+        assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(2));
+    }
+
+    @Test
     void archivesExpiredEventsWithoutChangingChainIntegrity() {
         service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
         var result = retentionService.archiveExpired();
@@ -140,6 +189,17 @@ class AuditEventServiceIntegrationTests {
         assertThat(result.recordsArchived()).isEqualTo(1);
         assertThat(service.query(null, null, null, null, null, null, 0, 20).getTotalElements()).isZero();
         assertThat(service.query(null, null, null, null, null, null, 0, 20, true).getTotalElements()).isEqualTo(1);
+        assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(1));
+    }
+
+    @Test
+    void retentionIsIdempotentForAlreadyArchivedEvents() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+
+        assertThat(retentionService.archiveExpired().recordsArchived()).isEqualTo(1);
+        assertThat(retentionService.archiveExpired().recordsArchived()).isZero();
+        assertThat(service.query(null, null, null, null, null, null, 0, 20, true).getTotalElements())
+                .isEqualTo(1);
         assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(1));
     }
 
