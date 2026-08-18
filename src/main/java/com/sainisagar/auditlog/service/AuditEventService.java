@@ -6,8 +6,10 @@ import com.sainisagar.auditlog.dto.ChainVerificationResponse;
 import com.sainisagar.auditlog.dto.ViolationType;
 import com.sainisagar.auditlog.entity.AuditEvent;
 import com.sainisagar.auditlog.entity.ChainState;
+import com.sainisagar.auditlog.entity.RedactionReceipt;
 import com.sainisagar.auditlog.repository.AuditEventRepository;
 import com.sainisagar.auditlog.repository.ChainStateRepository;
+import com.sainisagar.auditlog.repository.RedactionReceiptRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +24,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AuditEventService {
@@ -31,14 +37,19 @@ public class AuditEventService {
     private final AuditEventRepository eventRepository;
     private final ChainStateRepository chainStateRepository;
     private final AuditHashService hashService;
+    private final RedactionReceiptRepository receiptRepository;
+    private final RedactionProofService redactionProofService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public AuditEventService(AuditEventRepository eventRepository, ChainStateRepository chainStateRepository,
-                             AuditHashService hashService, ObjectMapper objectMapper) {
+                             AuditHashService hashService, RedactionReceiptRepository receiptRepository,
+                             RedactionProofService redactionProofService, ObjectMapper objectMapper) {
         this.eventRepository = eventRepository;
         this.chainStateRepository = chainStateRepository;
         this.hashService = hashService;
+        this.receiptRepository = receiptRepository;
+        this.redactionProofService = redactionProofService;
         this.objectMapper = objectMapper;
         this.clock = Clock.systemUTC();
     }
@@ -70,6 +81,13 @@ public class AuditEventService {
     @Transactional(readOnly = true)
     public Page<AuditEventResponse> query(String actorId, String resourceType, String resourceId,
                                           String eventType, Instant from, Instant to, int page, int size) {
+        return query(actorId, resourceType, resourceId, eventType, from, to, page, size, false);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AuditEventResponse> query(String actorId, String resourceType, String resourceId,
+                                          String eventType, Instant from, Instant to, int page, int size,
+                                          boolean includeArchived) {
         if (from != null && to != null && from.isAfter(to)) {
             throw new IllegalArgumentException("'from' must be before or equal to 'to'");
         }
@@ -79,6 +97,9 @@ public class AuditEventService {
         specification = andEqual(specification, "resourceType", resourceType);
         specification = andEqual(specification, "resourceId", resourceId);
         specification = andEqual(specification, "eventType", eventType);
+        if (!includeArchived) {
+            specification = specification.and((root, query, builder) -> builder.isFalse(root.get("archived")));
+        }
         if (from != null) {
             specification = specification.and((root, query, builder) ->
                     builder.greaterThanOrEqualTo(root.get("recordedAt"), from));
@@ -96,6 +117,13 @@ public class AuditEventService {
     @Transactional(readOnly = true)
     public ChainVerificationResponse verify() {
         List<AuditEvent> events = eventRepository.findAll(Sort.by(Sort.Direction.ASC, "sequenceNumber"));
+        Map<Long, RedactionReceipt> latestReceipts = receiptRepository.findAllByOrderByRedactedAtAsc().stream()
+                .collect(Collectors.toMap(RedactionReceipt::getTargetSequence, Function.identity(), (first, second) -> second));
+        Set<String> anchoredReceiptHashes = events.stream()
+                .filter(event -> "PAYLOAD_REDACTED".equals(event.getEventType()))
+                .map(this::readReceiptHash)
+                .filter(value -> value != null)
+                .collect(Collectors.toSet());
         String expectedPreviousHash = AuditHashService.GENESIS_HASH;
         long expectedSequence = 1;
         long checked = 0;
@@ -117,8 +145,11 @@ public class AuditEventService {
                         ViolationType.PREVIOUS_HASH_MISMATCH);
             }
             if (!hashService.recalculate(event).equals(event.getContentHash())) {
-                return ChainVerificationResponse.broken(checked, event.getSequenceNumber(),
-                        ViolationType.CONTENT_HASH_MISMATCH);
+                RedactionReceipt receipt = latestReceipts.get(event.getSequenceNumber());
+                if (!isAuthorizedRedaction(event, receipt, anchoredReceiptHashes)) {
+                    return ChainVerificationResponse.broken(checked, event.getSequenceNumber(),
+                            ViolationType.CONTENT_HASH_MISMATCH);
+                }
             }
             checked++;
             expectedSequence++;
@@ -134,14 +165,32 @@ public class AuditEventService {
         return current.and((root, query, builder) -> builder.equal(root.get(field), value));
     }
 
-    private AuditEventResponse toResponse(AuditEvent event) {
+    AuditEventResponse toResponse(AuditEvent event) {
         try {
             return new AuditEventResponse(event.getId(), event.getSequenceNumber(), event.getEventType(),
                     event.getActorId(), event.getResourceType(), event.getResourceId(),
                     objectMapper.readTree(event.getPayload()), event.getOccurredAt(), event.getRecordedAt(),
-                    event.getPreviousHash(), event.getContentHash(), event.getHashVersion());
+                    event.getPreviousHash(), event.getContentHash(), event.getHashVersion(),
+                    event.isArchived(), event.getArchivedAt());
         } catch (JacksonException exception) {
             throw new IllegalStateException("Stored payload is invalid", exception);
+        }
+    }
+
+    private boolean isAuthorizedRedaction(AuditEvent event, RedactionReceipt receipt,
+                                           Set<String> anchoredReceiptHashes) {
+        return receipt != null
+                && receipt.getOriginalContentHash().equals(event.getContentHash())
+                && receipt.getRedactedPayloadHash().equals(hashService.digestUtf8(event.getPayload()))
+                && redactionProofService.isValid(receipt)
+                && anchoredReceiptHashes.contains(receipt.getReceiptHash());
+    }
+
+    private String readReceiptHash(AuditEvent event) {
+        try {
+            return objectMapper.readTree(event.getPayload()).path("receiptHash").asString(null);
+        } catch (JacksonException exception) {
+            return null;
         }
     }
 }

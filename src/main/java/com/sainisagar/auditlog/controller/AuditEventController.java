@@ -46,8 +46,9 @@ public class AuditEventController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return service.query(actorId, resourceType, resourceId, eventType, from, to, page, size);
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean includeArchived) {
+        return service.query(actorId, resourceType, resourceId, eventType, from, to, page, size, includeArchived);
     }
 
     @GetMapping("/verify")

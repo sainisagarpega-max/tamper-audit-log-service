@@ -35,7 +35,7 @@ public class AuditEvent {
     @Column(name = "resource_id", nullable = false, updatable = false, length = 150)
     private String resourceId;
 
-    @Column(nullable = false, updatable = false, columnDefinition = "text")
+    @Column(nullable = false, columnDefinition = "text")
     private String payload;
 
     @Column(name = "occurred_at", updatable = false)
@@ -52,6 +52,12 @@ public class AuditEvent {
 
     @Column(name = "hash_version", nullable = false, updatable = false)
     private Integer hashVersion;
+
+    @Column(nullable = false)
+    private boolean archived;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
 
     protected AuditEvent() {
     }
@@ -84,4 +90,15 @@ public class AuditEvent {
     public String getPreviousHash() { return previousHash; }
     public String getContentHash() { return contentHash; }
     public Integer getHashVersion() { return hashVersion; }
+    public boolean isArchived() { return archived; }
+    public Instant getArchivedAt() { return archivedAt; }
+
+    public void archive(Instant archivedAt) {
+        this.archived = true;
+        this.archivedAt = archivedAt;
+    }
+
+    public void redactPayload(String redactedPayload) {
+        this.payload = redactedPayload;
+    }
 }

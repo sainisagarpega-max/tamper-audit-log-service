@@ -21,6 +21,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/audit-events").hasRole("AUDIT_WRITER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/retention/**", "/api/v1/audit-events/*/redactions")
+                        .hasRole("AUDIT_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/audit-events/**")
                         .hasAnyRole("AUDIT_READER", "AUDIT_ADMIN")
                         .anyRequest().denyAll())

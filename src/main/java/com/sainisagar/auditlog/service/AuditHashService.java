@@ -67,6 +67,16 @@ public class AuditHashService {
                 event.getRecordedAt(), event.getPreviousHash(), event.getHashVersion());
     }
 
+    public String digestUtf8(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
     private JsonNode sortNode(JsonNode node) {
         if (node.isObject()) {
             ObjectNode sorted = objectMapper.createObjectNode();

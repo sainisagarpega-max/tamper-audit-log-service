@@ -3,6 +3,7 @@ package com.sainisagar.auditlog.service;
 import com.sainisagar.auditlog.dto.AuditEventRequest;
 import com.sainisagar.auditlog.dto.AuditEventResponse;
 import com.sainisagar.auditlog.dto.ChainVerificationResponse;
+import com.sainisagar.auditlog.dto.RedactionRequest;
 import com.sainisagar.auditlog.dto.ViolationType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,10 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost/unused")
+@SpringBootTest(properties = {
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost/unused",
+        "app.retention.days=0"
+})
 class AuditEventServiceIntegrationTests {
 
     @Autowired
@@ -25,6 +29,15 @@ class AuditEventServiceIntegrationTests {
     private AuditHashService hashService;
 
     @Autowired
+    private RedactionService redactionService;
+
+    @Autowired
+    private ExportService exportService;
+
+    @Autowired
+    private RetentionService retentionService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -32,6 +45,7 @@ class AuditEventServiceIntegrationTests {
 
     @BeforeEach
     void resetChain() {
+        jdbcTemplate.update("delete from redaction_receipts");
         jdbcTemplate.update("delete from audit_events");
         jdbcTemplate.update("update chain_state set last_sequence = 0, last_hash = ? where chain_name = 'GLOBAL'",
                 AuditHashService.GENESIS_HASH);
@@ -93,6 +107,48 @@ class AuditEventServiceIntegrationTests {
 
         assertThat(firstCanonical).isEqualTo(secondCanonical);
         assertThat(firstHash).isEqualTo(secondHash).hasSize(64);
+    }
+
+    @Test
+    void redactsSensitiveFieldWithoutBreakingChain() {
+        AuditEventResponse event = service.create(request("READ", "actor-1", "account-1",
+                "{\"customer\":{\"accountNumber\":\"123456789\",\"name\":\"Sam\"}}"));
+
+        var receipt = redactionService.redact(event.id(),
+                new RedactionRequest("/customer/accountNumber", "privacy-admin", "privacy request"));
+
+        var redacted = service.query(null, null, "account-1", null, null, null, 0, 20, true)
+                .getContent().getFirst();
+        assertThat(redacted.payload().toString()).doesNotContain("123456789");
+        assertThat(redacted.payload().at("/customer/accountNumber/_redacted").asBoolean()).isTrue();
+        assertThat(receipt.saltedValueHash()).hasSize(64);
+        assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(2));
+    }
+
+    @Test
+    void archivesExpiredEventsWithoutChangingChainIntegrity() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        var result = retentionService.archiveExpired();
+
+        assertThat(result.recordsArchived()).isEqualTo(1);
+        assertThat(service.query(null, null, null, null, null, null, 0, 20).getTotalElements()).isZero();
+        assertThat(service.query(null, null, null, null, null, null, 0, 20, true).getTotalElements()).isEqualTo(1);
+        assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(1));
+    }
+
+    @Test
+    void exportsFilteredRecordsWithFullChainMetadata() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        AuditEventResponse second = service.create(request("UPDATE", "actor-2", "account-2",
+                "{\"result\":\"OK\"}"));
+
+        var bundle = exportService.export("actor-1", null);
+
+        assertThat(bundle.records()).hasSize(1);
+        assertThat(bundle.records().getFirst().actorId()).isEqualTo("actor-1");
+        assertThat(bundle.chainMetadata()).hasSize(2);
+        assertThat(bundle.chainHeadHash()).isEqualTo(second.contentHash());
+        assertThat(bundle.bundleHash()).hasSize(64);
     }
 
     private AuditEventRequest request(String eventType, String actorId, String resourceId, String payload) {

@@ -4,7 +4,7 @@ This repository contains the implementation and supporting documentation for the
 
 ## Project status
 
-Scenario A is implemented: append-only writes, filtered and paginated queries, a versioned SHA-256 hash chain, and full-chain verification with tamper detection.
+Scenarios A and B are implemented: append-only writes, filtered and paginated queries, a versioned SHA-256 hash chain, tamper verification, soft archival, structured redaction receipts, and bulk export metadata.
 
 ## Planned technology stack
 
@@ -24,6 +24,7 @@ Scenario A is implemented: append-only writes, filtered and paginated queries, a
 - [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) - normalized requirements, ambiguities, assumptions, and acceptance criteria
 - [docs/TASK_DECOMPOSITION.md](docs/TASK_DECOMPOSITION.md) - API plan, data model, dependencies, milestones, and quality gates
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - components, storage, data flow, API schemas, security, trade-offs, and risks
+- [docs/SCENARIO_B.md](docs/SCENARIO_B.md) - retention, salted-placeholder redaction, export verification, trade-offs, and limitations
 
 The confidential assignment PDF must not be committed or redistributed.
 
@@ -77,6 +78,9 @@ Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
 | `POST` | `/api/v1/audit-events` | Append an immutable audit event | `AUDIT_WRITER` |
 | `GET` | `/api/v1/audit-events` | Query using actor, resource, event type, time, and pagination filters | `AUDIT_READER` or `AUDIT_ADMIN` |
 | `GET` | `/api/v1/audit-events/verify` | Verify the complete hash chain | `AUDIT_READER` or `AUDIT_ADMIN` |
+| `POST` | `/api/v1/retention/archive` | Archive events outside the retention window | `AUDIT_ADMIN` |
+| `POST` | `/api/v1/audit-events/{id}/redactions` | Redact a payload field and anchor its receipt | `AUDIT_ADMIN` |
+| `GET` | `/api/v1/audit-events/export` | Export by actor or resource with chain metadata | `AUDIT_READER` or `AUDIT_ADMIN` |
 
 JWT roles are read from the token's `roles` claim. Example:
 
@@ -113,4 +117,4 @@ The verification response reports whether the chain is intact and identifies the
 mvn test
 ```
 
-The current suite covers application startup, Flyway schema validation, linked writes, deterministic nested JSON canonicalization, combined filters, pagination, intact verification, and direct database tampering detection.
+The current suite covers application startup, Flyway schema validation, linked writes, deterministic nested JSON canonicalization, combined filters, pagination, intact verification, direct database tampering, retention, redaction, and bulk export.

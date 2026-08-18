@@ -32,3 +32,8 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+
+app:
+  retention:
+    days: ${AUDIT_RETENTION_DAYS:365}
+    schedule: ${AUDIT_RETENTION_SCHEDULE:0 0 2 * * *}
