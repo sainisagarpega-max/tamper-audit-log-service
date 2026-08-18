@@ -23,6 +23,7 @@ Requirements analysis is complete. Application implementation is the next phase.
 - [AI_USAGE_LOG.md](AI_USAGE_LOG.md) - record of AI-assisted work
 - [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) - normalized requirements, ambiguities, assumptions, and acceptance criteria
 - [docs/TASK_DECOMPOSITION.md](docs/TASK_DECOMPOSITION.md) - API plan, data model, dependencies, milestones, and quality gates
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - components, storage, data flow, API schemas, security, trade-offs, and risks
 
 The confidential assignment PDF must not be committed or redistributed.
 
