@@ -4,7 +4,7 @@ This repository contains the implementation and supporting documentation for the
 
 ## Project status
 
-Scenarios A and B are implemented: append-only writes, filtered and paginated queries, a versioned SHA-256 hash chain, tamper verification, soft archival, structured redaction receipts, and bulk export metadata.
+Scenarios A, B, and C are implemented: append-only writes, filtered queries, versioned SHA-256 chaining, tamper verification, retention, redaction, export, and scoped client-account access compliance reporting.
 
 ## Planned technology stack
 
@@ -25,6 +25,7 @@ Scenarios A and B are implemented: append-only writes, filtered and paginated qu
 - [docs/TASK_DECOMPOSITION.md](docs/TASK_DECOMPOSITION.md) - API plan, data model, dependencies, milestones, and quality gates
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - components, storage, data flow, API schemas, security, trade-offs, and risks
 - [docs/SCENARIO_B.md](docs/SCENARIO_B.md) - retention, salted-placeholder redaction, export verification, trade-offs, and limitations
+- [docs/SCENARIO_C.md](docs/SCENARIO_C.md) - clarified compliance requirement, assumptions, questions, scoped design, implementation, and limitations
 
 The confidential assignment PDF must not be committed or redistributed.
 
@@ -81,6 +82,8 @@ Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
 | `POST` | `/api/v1/retention/archive` | Archive events outside the retention window | `AUDIT_ADMIN` |
 | `POST` | `/api/v1/audit-events/{id}/redactions` | Redact a payload field and anchor its receipt | `AUDIT_ADMIN` |
 | `GET` | `/api/v1/audit-events/export` | Export by actor or resource with chain metadata | `AUDIT_READER` or `AUDIT_ADMIN` |
+| `POST` | `/api/v1/compliance/account-access` | Record an allowed or denied client-account access attempt | `AUDIT_WRITER` |
+| `GET` | `/api/v1/compliance/account-access` | Query the client-account access compliance report | `AUDIT_COMPLIANCE` or `AUDIT_ADMIN` |
 
 JWT roles are read from the token's `roles` claim. Example:
 
@@ -117,4 +120,4 @@ The verification response reports whether the chain is intact and identifies the
 mvn test
 ```
 
-The current suite covers application startup, Flyway schema validation, linked writes, deterministic nested JSON canonicalization, combined filters, pagination, intact verification, direct database tampering, retention, redaction, and bulk export.
+The current suite covers application startup, Flyway schema validation, linked writes, canonical hashing, filters, pagination, tampering, retention, redaction, export, client-account access recording, compliance reporting, and report self-auditing.

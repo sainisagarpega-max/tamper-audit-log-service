@@ -2,6 +2,10 @@ package com.sainisagar.auditlog.service;
 
 import com.sainisagar.auditlog.dto.AuditEventRequest;
 import com.sainisagar.auditlog.dto.AuditEventResponse;
+import com.sainisagar.auditlog.dto.AccessChannel;
+import com.sainisagar.auditlog.dto.AccessOutcome;
+import com.sainisagar.auditlog.dto.AccountAccessAction;
+import com.sainisagar.auditlog.dto.ClientAccountAccessRequest;
 import com.sainisagar.auditlog.dto.ChainVerificationResponse;
 import com.sainisagar.auditlog.dto.RedactionRequest;
 import com.sainisagar.auditlog.dto.ViolationType;
@@ -36,6 +40,9 @@ class AuditEventServiceIntegrationTests {
 
     @Autowired
     private RetentionService retentionService;
+
+    @Autowired
+    private ComplianceAccessService complianceAccessService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -149,6 +156,28 @@ class AuditEventServiceIntegrationTests {
         assertThat(bundle.chainMetadata()).hasSize(2);
         assertThat(bundle.chainHeadHash()).isEqualTo(second.contentHash());
         assertThat(bundle.bundleHash()).hasSize(64);
+    }
+
+    @Test
+    void recordsAndReportsClientAccountAccessWithoutClientData() {
+        complianceAccessService.record(new ClientAccountAccessRequest("account-1", "advisor-1",
+                AccountAccessAction.VIEW, "Customer support", AccessChannel.WEB, AccessOutcome.ALLOWED,
+                "correlation-1", Instant.parse("2026-08-18T09:59:00Z")));
+        complianceAccessService.record(new ClientAccountAccessRequest("account-2", "advisor-2",
+                AccountAccessAction.SEARCH, "Fraud review", AccessChannel.API, AccessOutcome.DENIED,
+                "correlation-2", Instant.parse("2026-08-18T09:59:00Z")));
+
+        var report = complianceAccessService.report("account-1", null, null, null, 0, 20, "compliance-user");
+
+        assertThat(report.getTotalElements()).isEqualTo(1);
+        assertThat(report.getContent().getFirst().actorId()).isEqualTo("advisor-1");
+        assertThat(report.getContent().getFirst().purpose()).isEqualTo("Customer support");
+        var rawEvent = service.query("advisor-1", "CLIENT_ACCOUNT", "account-1", "CLIENT_ACCOUNT_ACCESS",
+                null, null, 0, 20, true).getContent().getFirst();
+        assertThat(rawEvent.payload().toString()).doesNotContain("clientData", "accountBalance");
+        assertThat(service.query("compliance-user", "COMPLIANCE_REPORT", null,
+                "COMPLIANCE_REPORT_ACCESSED", null, null, 0, 20, true).getTotalElements()).isEqualTo(1);
+        assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(3));
     }
 
     private AuditEventRequest request(String eventType, String actorId, String resourceId, String payload) {
