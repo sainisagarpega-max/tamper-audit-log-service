@@ -6,7 +6,7 @@
 - Email: saini.sagarpega@gmail.com
 - Assignment title: Build an AI-Assisted Software Engineering System - Audit Log Service
 - Start date: 18-08-2026
-- Submitted date: To be completed at submission
+- Submitted date: 19-08-2026
 
 ## Declaration
 
