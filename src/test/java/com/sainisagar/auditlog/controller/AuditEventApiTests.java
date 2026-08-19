@@ -138,7 +138,11 @@ class AuditEventApiTests {
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.bearerFormat").value("JWT"))
-                .andExpect(jsonPath("$.security[0].bearerAuth").isArray());
+                .andExpect(jsonPath("$.security[0].bearerAuth").isArray())
+                .andExpect(jsonPath("$['paths']['/api/v1/audit-events/export/verify']['post']").exists())
+                .andExpect(jsonPath("$.components.schemas.AuditExportBundle.properties.redactionProofs").exists())
+                .andExpect(jsonPath("$.components.schemas.ExportRedactionProof.properties.anchorEvent").exists())
+                .andExpect(jsonPath("$['paths']['/api/v1/dev/token']['post'].security").isEmpty());
 
         mockMvc.perform(get("/swagger-ui.html"))
                 .andExpect(status().is3xxRedirection());

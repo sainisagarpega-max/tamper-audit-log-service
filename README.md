@@ -167,4 +167,4 @@ mvn test
 
 The current suite covers application startup, local H2 console security, local RS256 token issuance and validation, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked and concurrent writes, canonical hashing, chain-head deletion detection, filters, pagination, multiple tampering patterns, retention and redaction edge cases, export generation and verification, client-account access recording, compliance reporting, and report self-auditing.
 
-PostgreSQL tests use Testcontainers. Start Docker Desktop before `mvn test` to execute them. Without Docker, JUnit reports the two PostgreSQL tests as skipped while all H2 tests continue to run.
+PostgreSQL remains the configured production database. Automated tests use H2; PostgreSQL runtime validation is a documented deployment follow-up and is not part of the local test suite.

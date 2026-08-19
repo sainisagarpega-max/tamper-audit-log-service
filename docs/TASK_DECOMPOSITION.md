@@ -175,7 +175,6 @@ A small single-row `chain_state` table will hold the latest sequence and hash. T
 - H2: fast local development and basic automated tests.
 - PostgreSQL: production database and concurrency-sensitive integration tests.
 - Flyway: versioned database schema and index creation.
-- Testcontainers PostgreSQL: realistic integration and locking tests.
 
 ### Cross-cutting dependencies
 
@@ -190,7 +189,7 @@ A small single-row `chain_state` table will hold the latest sequence and hash. T
 
 ### Milestone 1 - Stabilize project foundation
 
-1. Add Flyway and Testcontainers dependencies.
+1. Add Flyway dependencies.
 2. Replace Hibernate automatic schema updates with Flyway migrations.
 3. Create the `audit_events` and `chain_state` tables and indexes.
 4. Add a consistent API error response handler.
@@ -264,7 +263,7 @@ Quality gate: compliance users can reconstruct who accessed which account, when,
 
 ### Milestone 8 - Final validation and delivery
 
-1. Run unit, H2 integration, PostgreSQL integration, security, and concurrency tests.
+1. Run unit, H2 integration, security, and concurrency tests; perform PostgreSQL validation in the deployment environment.
 2. Run static analysis and dependency/security checks.
 3. Verify local setup from a clean checkout.
 4. Complete architecture, API, testing, limitation, risk, and trade-off documentation.

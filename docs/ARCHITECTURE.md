@@ -32,7 +32,7 @@ PostgreSQL is the production system of record because the problem requires stron
 
 ### Local development: H2
 
-H2 is used for quick local startup and lightweight tests. It runs in PostgreSQL compatibility mode, but it is not considered proof of production behavior. PostgreSQL integration tests are required for locking, concurrency, SQL types, indexing, and migration validation.
+H2 is used for quick local startup and automated tests. It runs in PostgreSQL compatibility mode, but it is not considered proof of production behavior. PostgreSQL locking, SQL types, indexing, and migration behavior must be validated in the target deployment environment.
 
 ### Rejected alternatives
 
@@ -362,7 +362,7 @@ Cost: Write latency includes locking, hashing, and database commit. Asynchronous
 
 Benefit: Easy local setup.
 
-Cost: H2 does not reproduce every PostgreSQL behavior. PostgreSQL tests remain mandatory for production-relevant guarantees.
+Cost: H2 does not reproduce every PostgreSQL behavior. Production deployment requires a separate PostgreSQL validation pass.
 
 ### Payload stored as canonical text
 
@@ -384,7 +384,7 @@ Cost: Local protected API testing requires a test issuer or signed test tokens. 
 | Concurrent write fork | Two records reference the same predecessor. | Lock the database chain-state row and enforce unique sequences in one transaction. |
 | Full database rewrite by privileged attacker | Attacker recalculates a valid-looking chain. | Least privilege, immutable external checkpoints, signed exports, and separated administrative control. |
 | Verification memory/time growth | Large chains cause slow responses or excessive memory. | Stream/page records, add metrics, and later introduce verified checkpoints. |
-| H2/PostgreSQL differences | Local success fails in production. | Run migrations and integration tests against PostgreSQL using Testcontainers. |
+| H2/PostgreSQL differences | Local success fails in production. | Run migrations and smoke/concurrency checks against the target PostgreSQL environment before deployment. |
 | Sensitive data in payloads | Privacy or compliance breach. | Schema guidance, allowlisted payloads, no payload logging, and Scenario B structured redaction. |
 | JWT misconfiguration | Unauthorized access or service outage. | Validate issuer/audience, test role mapping, rotate keys, and fail closed. |
 | Missing database immutability controls | Application or operator changes history. | Remove update/delete API paths and revoke production application `UPDATE`/`DELETE` privileges. |

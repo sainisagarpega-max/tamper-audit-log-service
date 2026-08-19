@@ -142,7 +142,7 @@ Decision: Treat application-mediated read attempts as access, including allowed 
 - Enforce least privilege on every protected endpoint.
 - Atomically lock the chain head, allocate a sequence, hash and store the event, and advance the head.
 - Prevent chain forks and duplicate sequences under concurrent writes.
-- Use the same Flyway migrations for H2 and PostgreSQL and run PostgreSQL tests for concurrency/database behavior.
+- Use portable Flyway migrations for H2 and PostgreSQL; validate PostgreSQL behavior separately before production deployment.
 - Load secrets from external configuration; never commit them.
 - Enable Swagger UI locally; make production exposure configurable and protected.
 - Never log payload contents, JWTs, credentials, account numbers, plaintext redacted values, or encryption keys.
@@ -166,7 +166,7 @@ Decision: Treat application-mediated read attempts as access, including allowed 
 13. The application runs with H2 locally and PostgreSQL through configuration only.
 14. Tests cover canonical hashing, verification, tamper detection, authorization, filters, concurrency, retention, redaction, and export.
 
-Current validation note: H2 concurrency and export verification are automated. PostgreSQL migration and concurrency tests are implemented with Testcontainers and require Docker to execute.
+Current validation note: H2 concurrency and export verification are automated. PostgreSQL runtime testing is outside the local automated suite and remains a deployment validation activity.
 
 ## 7. Questions requiring product/security/compliance confirmation
 
