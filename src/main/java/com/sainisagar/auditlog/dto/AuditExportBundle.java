@@ -11,6 +11,7 @@ public record AuditExportBundle(
         String hashAlgorithm,
         String genesisHash,
         List<AuditEventResponse> records,
+        List<ExportRedactionProof> redactionProofs,
         List<ExportChainLink> chainMetadata,
         String chainHeadHash,
         String bundleHash

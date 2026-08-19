@@ -80,23 +80,34 @@ GET /api/v1/audit-events/export?resourceId={resourceId}
 
 Exactly one filter is required. Archived matching records are included.
 
-The bundle contains:
+Export format version 2 contains:
 
 - Bundle format version and export timestamp.
 - Actor or resource filter.
 - SHA-256 algorithm and genesis definition.
 - Full matching audit-event records.
+- Redaction receipts and their complete `PAYLOAD_REDACTED` anchor events for matching redacted records.
 - Sequence, previous hash, content hash, and hash version for every chain position.
 - Chain-head hash at export time.
 - SHA-256 hash of the canonical unsigned bundle.
 
 The recipient can recompute each included event hash, confirm its hash occurs at the declared chain position, check chain-link continuity in the metadata, and recompute the bundle hash to detect modification after export.
 
+Verification endpoint:
+
+```text
+POST /api/v1/audit-events/export/verify
+```
+
+The endpoint requires `AUDIT_READER` or `AUDIT_ADMIN`. It consumes an `AuditExportBundle` and returns `valid`, `violation`, and the affected `sequenceNumber`. Verification uses only bundle contents: it recomputes the outer bundle hash, validates metadata continuity from genesis through the declared head, and recomputes every included event hash. It does not modify or query stored audit events.
+
 Limitations:
 
 - The bundle hash provides integrity, not sender authenticity. Production exports should be digitally signed using a managed asymmetric key.
 - Metadata-only entries prove chain linkage but cannot independently recompute non-exported event content.
 - Proving that the exporter did not omit a matching event requires trusting the exporter or using a signed authenticated index/Merkle proof.
+- The verifier establishes internal bundle consistency, not publisher identity. An attacker who can replace the entire unsigned bundle and its declared head can construct a different internally consistent bundle.
+- A redacted record is accepted only when its current payload matches the receipt, the receipt hash recomputes, the anchor event contains that receipt hash, the anchor event hash recomputes, and the anchor is present at the declared chain position.
 - Export authorization and delivery-channel encryption remain production responsibilities.
 
 ## 4. Scenario B acceptance evidence
@@ -110,3 +121,6 @@ Automated integration tests demonstrate:
 - A salted placeholder and immutable receipt are produced.
 - The anchored redaction remains verifiable.
 - Filtered export includes matching records, complete chain metadata, chain head, and a bundle hash.
+- Untouched exports pass self-contained verification.
+- Modifying an exported event fails verification even if the outer bundle hash is recomputed.
+- Legitimately redacted exports pass verification; altering a receipt fails even if the outer bundle hash is recomputed.

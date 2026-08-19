@@ -48,4 +48,28 @@ class SecurityConfigTests {
                 .extracting("authority")
                 .noneMatch(authority -> ((String) authority).startsWith("ROLE_"));
     }
+
+    @Test
+    void audienceValidatorAcceptsRequiredAudience() {
+        Jwt jwt = jwtWithAudience(List.of("another-api", "audit-log-api"));
+
+        assertThat(new JwtAudienceValidator("audit-log-api").validate(jwt).hasErrors()).isFalse();
+    }
+
+    @Test
+    void audienceValidatorRejectsMissingRequiredAudience() {
+        Jwt jwt = jwtWithAudience(List.of("another-api"));
+
+        assertThat(new JwtAudienceValidator("audit-log-api").validate(jwt).hasErrors()).isTrue();
+    }
+
+    private Jwt jwtWithAudience(List<String> audience) {
+        return Jwt.withTokenValue("test-token")
+                .header("alg", "RS256")
+                .subject("saini-sagar")
+                .audience(audience)
+                .issuedAt(Instant.parse("2026-08-18T10:00:00Z"))
+                .expiresAt(Instant.parse("2026-08-18T11:00:00Z"))
+                .build();
+    }
 }

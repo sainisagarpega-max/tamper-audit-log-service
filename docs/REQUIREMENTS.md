@@ -30,6 +30,7 @@ The system shall:
 - Paginate deterministic query results.
 - Expose a full-chain verification endpoint.
 - Report whether the chain is intact and, when broken, identify the first inconsistent record and violation type.
+- Compare the verified final event sequence/hash with persisted `chain_state` so tail or complete-chain deletion is detected.
 - Detect a modification performed directly in the database.
 
 ### 2.2 Scenario B - Retention, redaction, and export
@@ -164,6 +165,8 @@ Decision: Treat application-mediated read attempts as access, including allowed 
 12. OpenAPI describes schemas, errors, filters, pagination, verification, redaction, export, and JWT security.
 13. The application runs with H2 locally and PostgreSQL through configuration only.
 14. Tests cover canonical hashing, verification, tamper detection, authorization, filters, concurrency, retention, redaction, and export.
+
+Current validation note: H2 concurrency and export verification are automated. PostgreSQL migration and concurrency tests are implemented with Testcontainers and require Docker to execute.
 
 ## 7. Questions requiring product/security/compliance confirmation
 

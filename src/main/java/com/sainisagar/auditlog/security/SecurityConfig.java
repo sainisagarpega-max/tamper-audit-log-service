@@ -28,6 +28,8 @@ public class SecurityConfig {
                         authorize.requestMatchers(PathRequest.toH2Console()).permitAll();
                     }
                     authorize.requestMatchers(HttpMethod.POST, "/api/v1/dev/token").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/api/v1/audit-events/export/verify")
+                            .hasAnyRole("AUDIT_READER", "AUDIT_ADMIN")
                             .requestMatchers(HttpMethod.POST, "/api/v1/audit-events").hasRole("AUDIT_WRITER")
                             .requestMatchers(HttpMethod.POST, "/api/v1/compliance/account-access")
                             .hasRole("AUDIT_WRITER")

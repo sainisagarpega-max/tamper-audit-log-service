@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.sainisagar.auditlog.security.JwtAudienceValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,10 +45,11 @@ public class LocalJwtConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(RSAKey rsaKey, @Value("${app.jwt.local.issuer}") String issuer) throws Exception {
+    JwtDecoder jwtDecoder(RSAKey rsaKey, @Value("${app.jwt.local.issuer}") String issuer,
+                          @Value("${app.jwt.local.audience}") String audience) throws Exception {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<Jwt>(
-                new JwtTimestampValidator(), new JwtIssuerValidator(issuer)));
+                new JwtTimestampValidator(), new JwtIssuerValidator(issuer), new JwtAudienceValidator(audience)));
         return decoder;
     }
 }

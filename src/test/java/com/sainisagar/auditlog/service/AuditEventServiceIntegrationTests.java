@@ -9,6 +9,8 @@ import com.sainisagar.auditlog.dto.ClientAccountAccessRequest;
 import com.sainisagar.auditlog.dto.ChainVerificationResponse;
 import com.sainisagar.auditlog.dto.RedactionRequest;
 import com.sainisagar.auditlog.dto.ViolationType;
+import com.sainisagar.auditlog.dto.AuditExportBundle;
+import com.sainisagar.auditlog.dto.ExportRedactionProof;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +45,9 @@ class AuditEventServiceIntegrationTests {
 
     @Autowired
     private ExportService exportService;
+
+    @Autowired
+    private ExportVerificationService exportVerificationService;
 
     @Autowired
     private RetentionService retentionService;
@@ -130,6 +140,33 @@ class AuditEventServiceIntegrationTests {
     }
 
     @Test
+    void detectsDeletionOfLastEventUsingPersistedChainHead() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        service.create(request("UPDATE", "actor-2", "account-2", "{\"result\":\"OK\"}"));
+
+        jdbcTemplate.update("delete from audit_events where sequence_number = 2");
+
+        ChainVerificationResponse result = service.verify();
+        assertThat(result.intact()).isFalse();
+        assertThat(result.recordsChecked()).isEqualTo(1);
+        assertThat(result.firstBrokenSequence()).isEqualTo(2);
+        assertThat(result.violationType()).isEqualTo(ViolationType.CHAIN_HEAD_MISMATCH);
+    }
+
+    @Test
+    void detectsDeletionOfCompleteChainUsingPersistedChainHead() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+
+        jdbcTemplate.update("delete from audit_events");
+
+        ChainVerificationResponse result = service.verify();
+        assertThat(result.intact()).isFalse();
+        assertThat(result.recordsChecked()).isZero();
+        assertThat(result.firstBrokenSequence()).isEqualTo(1);
+        assertThat(result.violationType()).isEqualTo(ViolationType.CHAIN_HEAD_MISMATCH);
+    }
+
+    @Test
     void canonicalPayloadAndHashAreIndependentOfObjectKeyOrder() throws Exception {
         var firstPayload = objectMapper.readTree("{\"outer\":{\"b\":2,\"a\":1},\"z\":true}");
         var secondPayload = objectMapper.readTree("{\"z\":true,\"outer\":{\"a\":1,\"b\":2}}");
@@ -160,6 +197,25 @@ class AuditEventServiceIntegrationTests {
         assertThat(redacted.payload().at("/customer/accountNumber/_redacted").asBoolean()).isTrue();
         assertThat(receipt.saltedValueHash()).hasSize(64);
         assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(2));
+        AuditExportBundle bundle = exportService.export("actor-1", null);
+        assertThat(bundle.bundleVersion()).isEqualTo("2");
+        assertThat(bundle.redactionProofs()).hasSize(1);
+        assertThat(bundle.redactionProofs().getFirst().anchorEvent().eventType()).isEqualTo("PAYLOAD_REDACTED");
+        assertThat(exportVerificationService.verify(bundle).valid()).isTrue();
+
+        ExportRedactionProof proof = bundle.redactionProofs().getFirst();
+        ExportRedactionProof alteredProof = new ExportRedactionProof(proof.targetSequence(),
+                proof.originalContentHash(), proof.jsonPointer(), proof.saltedValueHash(),
+                proof.redactedPayloadHash(), proof.requestedBy(), "altered reason", proof.redactedAt(),
+                proof.receiptHash(), proof.anchorEvent());
+        AuditExportBundle alteredWithoutHash = new AuditExportBundle(bundle.bundleVersion(), bundle.exportedAt(),
+                bundle.actorId(), bundle.resourceId(), bundle.hashAlgorithm(), bundle.genesisHash(), bundle.records(),
+                List.of(alteredProof), bundle.chainMetadata(), bundle.chainHeadHash(), null);
+        AuditExportBundle altered = new AuditExportBundle(bundle.bundleVersion(), bundle.exportedAt(), bundle.actorId(),
+                bundle.resourceId(), bundle.hashAlgorithm(), bundle.genesisHash(), bundle.records(),
+                alteredWithoutHash.redactionProofs(), bundle.chainMetadata(), bundle.chainHeadHash(),
+                exportService.calculateBundleHash(alteredWithoutHash));
+        assertThat(exportVerificationService.verify(altered).valid()).isFalse();
     }
 
     @Test
@@ -216,6 +272,59 @@ class AuditEventServiceIntegrationTests {
         assertThat(bundle.chainMetadata()).hasSize(2);
         assertThat(bundle.chainHeadHash()).isEqualTo(second.contentHash());
         assertThat(bundle.bundleHash()).hasSize(64);
+        assertThat(exportVerificationService.verify(bundle).valid()).isTrue();
+    }
+
+    @Test
+    void exportVerifierRejectsModifiedRecordEvenWhenBundleHashIsRecomputed() {
+        service.create(request("READ", "actor-1", "account-1", "{\"result\":\"OK\"}"));
+        AuditExportBundle original = exportService.export("actor-1", null);
+        AuditEventResponse record = original.records().getFirst();
+        AuditEventResponse modifiedRecord = new AuditEventResponse(record.id(), record.sequenceNumber(),
+                record.eventType(), "attacker", record.resourceType(), record.resourceId(), record.payload(),
+                record.occurredAt(), record.recordedAt(), record.previousHash(), record.contentHash(),
+                record.hashVersion(), record.archived(), record.archivedAt());
+        AuditExportBundle modifiedWithoutHash = new AuditExportBundle(original.bundleVersion(), original.exportedAt(),
+                original.actorId(), original.resourceId(), original.hashAlgorithm(), original.genesisHash(),
+                List.of(modifiedRecord), original.redactionProofs(), original.chainMetadata(),
+                original.chainHeadHash(), null);
+        AuditExportBundle modified = new AuditExportBundle(original.bundleVersion(), original.exportedAt(),
+                original.actorId(), original.resourceId(), original.hashAlgorithm(), original.genesisHash(),
+                modifiedWithoutHash.records(), original.redactionProofs(), original.chainMetadata(),
+                original.chainHeadHash(), exportService.calculateBundleHash(modifiedWithoutHash));
+
+        var result = exportVerificationService.verify(modified);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.violation()).isEqualTo("RECORD_CONTENT_HASH_MISMATCH");
+        assertThat(result.sequenceNumber()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentWritesProduceOneLinearChain() {
+        int writeCount = 12;
+        var executor = Executors.newFixedThreadPool(6);
+        try {
+            List<CompletableFuture<AuditEventResponse>> futures = new ArrayList<>();
+            for (int index = 0; index < writeCount; index++) {
+                int eventNumber = index;
+                futures.add(CompletableFuture.supplyAsync(() -> service.create(request("READ",
+                        "actor-" + eventNumber, "account-" + eventNumber, "{\"result\":\"OK\"}")), executor));
+            }
+            List<AuditEventResponse> events = futures.stream().map(CompletableFuture::join)
+                    .sorted(Comparator.comparing(AuditEventResponse::sequenceNumber)).toList();
+
+            assertThat(events).extracting(AuditEventResponse::sequenceNumber)
+                    .containsExactlyElementsOf(java.util.stream.LongStream.rangeClosed(1, writeCount).boxed().toList());
+            assertThat(events).extracting(AuditEventResponse::sequenceNumber).doesNotHaveDuplicates();
+            assertThat(events.getFirst().previousHash()).isEqualTo(AuditHashService.GENESIS_HASH);
+            for (int index = 1; index < events.size(); index++) {
+                assertThat(events.get(index).previousHash()).isEqualTo(events.get(index - 1).contentHash());
+            }
+            assertThat(service.verify()).isEqualTo(ChainVerificationResponse.intact(writeCount));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

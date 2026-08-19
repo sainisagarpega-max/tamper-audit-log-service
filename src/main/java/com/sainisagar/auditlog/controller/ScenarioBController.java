@@ -4,7 +4,9 @@ import com.sainisagar.auditlog.dto.AuditExportBundle;
 import com.sainisagar.auditlog.dto.RedactionRequest;
 import com.sainisagar.auditlog.dto.RedactionResponse;
 import com.sainisagar.auditlog.dto.RetentionResponse;
+import com.sainisagar.auditlog.dto.ExportVerificationResponse;
 import com.sainisagar.auditlog.service.ExportService;
+import com.sainisagar.auditlog.service.ExportVerificationService;
 import com.sainisagar.auditlog.service.RedactionService;
 import com.sainisagar.auditlog.service.RetentionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,12 +26,14 @@ public class ScenarioBController {
     private final RetentionService retentionService;
     private final RedactionService redactionService;
     private final ExportService exportService;
+    private final ExportVerificationService exportVerificationService;
 
     public ScenarioBController(RetentionService retentionService, RedactionService redactionService,
-                               ExportService exportService) {
+                               ExportService exportService, ExportVerificationService exportVerificationService) {
         this.retentionService = retentionService;
         this.redactionService = redactionService;
         this.exportService = exportService;
+        this.exportVerificationService = exportVerificationService;
     }
 
     @PostMapping("/retention/archive")
@@ -49,5 +53,11 @@ public class ScenarioBController {
     public AuditExportBundle export(@RequestParam(required = false) String actorId,
                                     @RequestParam(required = false) String resourceId) {
         return exportService.export(actorId, resourceId);
+    }
+
+    @PostMapping("/audit-events/export/verify")
+    @Operation(summary = "Verify an exported audit bundle without changing stored data")
+    public ExportVerificationResponse verifyExport(@RequestBody AuditExportBundle bundle) {
+        return exportVerificationService.verify(bundle);
     }
 }

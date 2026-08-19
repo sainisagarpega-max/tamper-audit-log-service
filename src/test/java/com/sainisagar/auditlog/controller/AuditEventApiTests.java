@@ -1,6 +1,9 @@
 package com.sainisagar.auditlog.controller;
 
 import com.sainisagar.auditlog.service.AuditHashService;
+import com.sainisagar.auditlog.service.AuditEventService;
+import com.sainisagar.auditlog.service.ExportService;
+import com.sainisagar.auditlog.dto.AuditEventRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,12 @@ class AuditEventApiTests {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AuditEventService auditEventService;
+
+    @Autowired
+    private ExportService exportService;
 
     private MockMvc mockMvc;
 
@@ -175,6 +184,21 @@ class AuditEventApiTests {
                 // MockMvc does not mount Boot's separately registered H2 servlet.
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("X-Frame-Options", "SAMEORIGIN"));
+    }
+
+    @Test
+    void readerCanVerifyExportBundleThroughApi() throws Exception {
+        auditEventService.create(new AuditEventRequest("READ", "actor-1", "ACCOUNT", "account-1",
+                objectMapper.readTree("{\"result\":\"OK\"}"), null));
+        var bundle = exportService.export("actor-1", null);
+
+        mockMvc.perform(post("/api/v1/audit-events/export/verify")
+                        .with(jwtWithRole("AUDIT_READER"))
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(bundle)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.violation").doesNotExist());
     }
 
     private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtWithRole(String role) {

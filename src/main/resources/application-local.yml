@@ -13,4 +13,5 @@ app:
   jwt:
     local:
       issuer: http://localhost:8080
+      audience: audit-log-api
       ttl-minutes: 30

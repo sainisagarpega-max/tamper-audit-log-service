@@ -96,6 +96,7 @@ Initial violation types:
 - `SEQUENCE_GAP`
 - `PREVIOUS_HASH_MISMATCH`
 - `CONTENT_HASH_MISMATCH`
+- `CHAIN_HEAD_MISMATCH`
 
 Acceptance criteria:
 
@@ -103,6 +104,7 @@ Acceptance criteria:
 - An unchanged chain is reported as intact.
 - Direct modification of hashed event content is detected.
 - A changed predecessor link or sequence gap is detected.
+- A deleted tail event or completely deleted event table is detected by comparison with `chain_state`.
 - The first inconsistent sequence and violation type are reported.
 - The endpoint performs no repair or data mutation.
 - The endpoint requires read or administrative authority.

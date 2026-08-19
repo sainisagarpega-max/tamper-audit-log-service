@@ -97,7 +97,7 @@ curl http://localhost:8080/api/v1/audit-events/verify \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-Allowed local roles are `AUDIT_WRITER`, `AUDIT_READER`, `AUDIT_ADMIN`, and `AUDIT_COMPLIANCE`. The RSA signing key is generated in memory at startup, so local tokens become invalid when the application restarts. The token endpoint and signing key beans are restricted to the `local` Spring profile and are absent in production.
+Allowed local roles are `AUDIT_WRITER`, `AUDIT_READER`, `AUDIT_ADMIN`, and `AUDIT_COMPLIANCE`. Local tokens contain `aud: ["audit-log-api"]`. The RSA signing key is generated in memory at startup, so local tokens become invalid when the application restarts. The token endpoint and signing key beans are restricted to the `local` Spring profile and are absent in production.
 
 ## Production database
 
@@ -110,6 +110,7 @@ DB_USERNAME=auditlog
 DB_PASSWORD=change-me
 JWT_ISSUER_URI=https://identity.example.com
 JWT_JWK_SET_URI=https://identity.example.com/.well-known/jwks.json
+JWT_AUDIENCE=audit-log-api
 ```
 
 Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
@@ -124,6 +125,7 @@ Swagger is disabled in production unless `SWAGGER_ENABLED=true`.
 | `POST` | `/api/v1/retention/archive` | Archive events outside the retention window | `AUDIT_ADMIN` |
 | `POST` | `/api/v1/audit-events/{id}/redactions` | Redact a payload field and anchor its receipt | `AUDIT_ADMIN` |
 | `GET` | `/api/v1/audit-events/export` | Export by actor or resource with chain metadata | `AUDIT_READER` or `AUDIT_ADMIN` |
+| `POST` | `/api/v1/audit-events/export/verify` | Verify bundle hash, chain metadata, and exported event hashes | `AUDIT_READER` or `AUDIT_ADMIN` |
 | `POST` | `/api/v1/compliance/account-access` | Record an allowed or denied client-account access attempt | `AUDIT_WRITER` |
 | `GET` | `/api/v1/compliance/account-access` | Query the client-account access compliance report | `AUDIT_COMPLIANCE` or `AUDIT_ADMIN` |
 | `POST` | `/api/v1/dev/token` | Generate a short-lived JWT for local development only | Public, local profile only |
@@ -155,7 +157,7 @@ Write request example:
 
 Query parameters are `actorId`, `resourceType`, `resourceId`, `eventType`, `from`, `to`, `page`, and `size`. Time filters apply to the server-assigned `recordedAt` value. Results are ordered by ascending chain sequence.
 
-The verification response reports whether the chain is intact and identifies the first broken sequence and violation type when tampering is detected.
+The verification response reports whether the chain is intact and identifies the first broken sequence and violation type when tampering is detected. Verification also compares the final stored event with the persisted chain head, so deletion of the last event or the complete event table produces `CHAIN_HEAD_MISMATCH`.
 
 ## Tests
 
@@ -163,4 +165,6 @@ The verification response reports whether the chain is intact and identifies the
 mvn test
 ```
 
-The current 22-test suite covers application startup, local H2 console security, local RS256 token issuance and validation, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked writes, canonical hashing, filters, pagination, multiple tampering patterns, retention edge cases, redaction edge cases, export, client-account access recording, compliance reporting, and report self-auditing.
+The current suite covers application startup, local H2 console security, local RS256 token issuance and validation, generated Swagger/OpenAPI bearer configuration, JWT role-claim conversion, authenticated API behavior, validation and authorization, Flyway schema validation, linked and concurrent writes, canonical hashing, chain-head deletion detection, filters, pagination, multiple tampering patterns, retention and redaction edge cases, export generation and verification, client-account access recording, compliance reporting, and report self-auditing.
+
+PostgreSQL tests use Testcontainers. Start Docker Desktop before `mvn test` to execute them. Without Docker, JUnit reports the two PostgreSQL tests as skipped while all H2 tests continue to run.

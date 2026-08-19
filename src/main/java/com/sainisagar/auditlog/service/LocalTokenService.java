@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
+import java.util.List;
 
 @Service
 @Profile("local")
@@ -26,13 +27,16 @@ public class LocalTokenService {
     private final JwtEncoder encoder;
     private final String issuer;
     private final long ttlMinutes;
+    private final String audience;
     private final Clock clock = Clock.systemUTC();
 
     public LocalTokenService(JwtEncoder encoder,
                              @Value("${app.jwt.local.issuer}") String issuer,
+                             @Value("${app.jwt.local.audience}") String audience,
                              @Value("${app.jwt.local.ttl-minutes}") long ttlMinutes) {
         this.encoder = encoder;
         this.issuer = issuer;
+        this.audience = audience;
         this.ttlMinutes = ttlMinutes;
     }
 
@@ -45,6 +49,7 @@ public class LocalTokenService {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(request.subject())
+                .audience(List.of(audience))
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
                 .claim("roles", request.roles())

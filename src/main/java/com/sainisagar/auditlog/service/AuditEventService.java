@@ -117,6 +117,8 @@ public class AuditEventService {
     @Transactional(readOnly = true)
     public ChainVerificationResponse verify() {
         List<AuditEvent> events = eventRepository.findAll(Sort.by(Sort.Direction.ASC, "sequenceNumber"));
+        ChainState chainState = chainStateRepository.findById(GLOBAL_CHAIN)
+                .orElseThrow(() -> new IllegalStateException("Global chain state is missing"));
         Map<Long, RedactionReceipt> latestReceipts = receiptRepository.findAllByOrderByRedactedAtAsc().stream()
                 .collect(Collectors.toMap(RedactionReceipt::getTargetSequence, Function.identity(), (first, second) -> second));
         Set<String> anchoredReceiptHashes = events.stream()
@@ -154,6 +156,12 @@ public class AuditEventService {
             checked++;
             expectedSequence++;
             expectedPreviousHash = event.getContentHash();
+        }
+        long finalSequence = expectedSequence - 1;
+        if (chainState.getLastSequence() != finalSequence
+                || !chainState.getLastHash().equals(expectedPreviousHash)) {
+            long brokenSequence = Math.max(1, Math.max(finalSequence, chainState.getLastSequence()));
+            return ChainVerificationResponse.broken(checked, brokenSequence, ViolationType.CHAIN_HEAD_MISMATCH);
         }
         return ChainVerificationResponse.intact(checked);
     }

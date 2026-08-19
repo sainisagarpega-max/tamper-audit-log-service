@@ -13,6 +13,7 @@ spring:
         jwt:
           issuer-uri: ${JWT_ISSUER_URI}
           jwk-set-uri: ${JWT_JWK_SET_URI}
+          audiences: ${JWT_AUDIENCE}
 
 springdoc:
   api-docs:
